@@ -1,102 +1,103 @@
-// Your script here.
+// Initialize Web Speech API
 const synth = window.speechSynthesis;
+let utterance = new SpeechSynthesisUtterance();
+let voices = [];
 
 // DOM Elements
 const textInput = document.getElementById('text-input');
 const voiceSelect = document.getElementById('voice-select');
 const rateInput = document.getElementById('rate');
-const rateValue = document.getElementById('rate-value');
 const pitchInput = document.getElementById('pitch');
-const pitchValue = document.getElementById('pitch-value');
 const speakBtn = document.getElementById('speak-btn');
 const stopBtn = document.getElementById('stop-btn');
 
-let voices = [];
-
-// Populate Available Voices
+// Populate Voice Dropdown
 function populateVoiceList() {
-  if (!synth) {
-    voiceSelect.innerHTML = '<option value="">Speech Synthesis Not Supported</option>';
-    return;
-  }
-
   voices = synth.getVoices();
+  
+  // Clear existing options
   voiceSelect.innerHTML = '';
 
   if (voices.length === 0) {
-    voiceSelect.innerHTML = '<option value="">No voices available</option>';
+    const option = document.createElement('option');
+    option.textContent = 'No voices available';
+    voiceSelect.appendChild(option);
     return;
   }
 
+  // Add voices to select dropdown
   voices.forEach((voice, index) => {
     const option = document.createElement('option');
-    option.textContent = `${voice.name} (${voice.lang})${voice.default ? ' — Default' : ''}`;
+    option.textContent = `${voice.name} (${voice.lang})`;
     option.setAttribute('data-index', index);
+    option.value = index;
+    
+    if (voice.default) {
+      option.selected = true;
+    }
+    
     voiceSelect.appendChild(option);
   });
 }
 
-// Dynamic Voice Loading (Chromium browsers fire onvoiceschanged)
+// Fetch available voices dynamically
 populateVoiceList();
-if (synth && synth.onvoiceschanged !== undefined) {
+if (synth.onvoiceschanged !== undefined) {
   synth.onvoiceschanged = populateVoiceList;
 }
 
-// Speak Functionality
-function speak() {
-  // Prevent speech synthesis if input is empty
-  const text = textInput.value.trim();
-  if (!text) return;
+// Update Speech Parameters
+function updateSpeechSettings() {
+  utterance.text = textInput.value.trim();
+  utterance.rate = parseFloat(rateInput.value);
+  utterance.pitch = parseFloat(pitchInput.value);
 
-  // Stop ongoing speech before starting new utterance
+  const selectedIndex = voiceSelect.value;
+  if (voices[selectedIndex]) {
+    utterance.voice = voices[selectedIndex];
+  }
+}
+
+// Start Speech Synthesis
+function startSpeech() {
+  const text = textInput.value.trim();
+  if (!text) return; // Prevent empty speech
+
+  // Stop any ongoing speech before starting new one
   if (synth.speaking) {
     synth.cancel();
   }
 
-  const utterThis = new SpeechSynthesisUtterance(text);
-
-  // Set Selected Voice
-  const selectedIndex = voiceSelect.selectedOptions[0]?.getAttribute('data-index');
-  if (selectedIndex !== null && voices[selectedIndex]) {
-    utterThis.voice = voices[selectedIndex];
-  }
-
-  // Set Rate and Pitch
-  utterThis.rate = parseFloat(rateInput.value);
-  utterThis.pitch = parseFloat(pitchInput.value);
-
-  synth.speak(utterThis);
+  updateSpeechSettings();
+  synth.speak(utterance);
 }
 
-// Stop Functionality
-function stop() {
+// Stop Speech Synthesis
+function stopSpeech() {
   if (synth.speaking || synth.pending) {
     synth.cancel();
   }
 }
 
 // Event Listeners
-speakBtn.addEventListener('click', speak);
-stopBtn.addEventListener('click', stop);
+speakBtn.addEventListener('click', startSpeech);
+stopBtn.addEventListener('click', stopSpeech);
 
-// Update Slider Labels Dynamically
+// Dynamic updates for Rate, Pitch, and Voice changes
 rateInput.addEventListener('input', () => {
-  if (rateValue) rateValue.textContent = rateInput.value;
+  utterance.rate = parseFloat(rateInput.value);
+  if (synth.speaking) startSpeech();
 });
 
 pitchInput.addEventListener('input', () => {
-  if (pitchValue) pitchValue.textContent = pitchInput.value;
+  utterance.pitch = parseFloat(pitchInput.value);
+  if (synth.speaking) startSpeech();
 });
 
-// Handle mid-speech Voice/Rate/Pitch switching by restarting speech if speaking
 voiceSelect.addEventListener('change', () => {
-  if (synth.speaking) speak();
-});
-
-rateInput.addEventListener('change', () => {
-  if (synth.speaking) speak();
-});
-
-pitchInput.addEventListener('change', () => {
-  if (synth.speaking) speak();
+  const selectedIndex = voiceSelect.value;
+  if (voices[selectedIndex]) {
+    utterance.voice = voices[selectedIndex];
+  }
+  if (synth.speaking) startSpeech();
 });

@@ -65,6 +65,22 @@
       border-radius: 6px;
     }
 
+    /* Dedicated Status Message Alert */
+    .status-message {
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .status-message.error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      display: block;
+    }
+
     .controls {
       display: flex;
       gap: 10px;
@@ -106,6 +122,9 @@
   <div class="container">
     <h1>Speech Synthesis</h1>
 
+    <!-- Dedicated UI Status Message Box -->
+    <div id="voice-message" class="status-message"></div>
+
     <div class="field-group">
       <label for="text-input">Enter Text:</label>
       <textarea id="text-input" placeholder="Type text here to speak..."></textarea>
@@ -114,7 +133,7 @@
     <div class="field-group">
       <label for="voice-select">Select Voice:</label>
       <select id="voice-select">
-        <option value="">Loading voices...</option>
+        <option value="">Select a voice</option>
       </select>
     </div>
 
@@ -141,6 +160,7 @@
     // DOM Elements
     const textInput = document.getElementById('text-input');
     const voiceSelect = document.getElementById('voice-select');
+    const voiceMessage = document.getElementById('voice-message');
     const rateInput = document.getElementById('rate');
     const pitchInput = document.getElementById('pitch');
     const rateVal = document.getElementById('rate-val');
@@ -148,16 +168,25 @@
     const speakBtn = document.getElementById('speak-btn');
     const stopBtn = document.getElementById('stop-btn');
 
-    // Populate Voice Dropdown
+    // Populate Voice Dropdown & Handle UI Notification
     function populateVoiceList() {
       voices = synth.getVoices();
 
       if (voices.length === 0) {
+        // Display separate error banner message
+        voiceMessage.textContent = 'No speech synthesis voices are currently available on this device or browser.';
+        voiceMessage.className = 'status-message error';
         voiceSelect.innerHTML = '<option value="">No voices available</option>';
+        voiceSelect.disabled = true;
         return;
       }
 
+      // Clear any active error message
+      voiceMessage.textContent = '';
+      voiceMessage.className = 'status-message';
+      voiceSelect.disabled = false;
       voiceSelect.innerHTML = '';
+
       voices.forEach((voice, index) => {
         const option = document.createElement('option');
         option.textContent = `${voice.name} (${voice.lang})`;
@@ -169,7 +198,7 @@
       });
     }
 
-    // Dynamic voice population handling for Chrome/Safari async loading
+    // Dynamic voice population
     populateVoiceList();
     if (synth.onvoiceschanged !== undefined) {
       synth.onvoiceschanged = populateVoiceList;
@@ -179,28 +208,22 @@
     function startSpeech() {
       const text = textInput.value.trim();
 
-      // Prevent speech if text input is empty
-      if (!text) return;
+      if (!text || voices.length === 0) return;
 
-      // Stop any ongoing speech before starting a new one
       if (synth.speaking || synth.pending) {
         synth.cancel();
       }
 
-      // Create new Utterance instance
       const utterance = new SpeechSynthesisUtterance(text);
 
-      // Assign Voice
       const selectedIndex = voiceSelect.value;
       if (selectedIndex !== "" && voices[selectedIndex]) {
         utterance.voice = voices[selectedIndex];
       }
 
-      // Assign Rate and Pitch
       utterance.rate = parseFloat(rateInput.value);
       utterance.pitch = parseFloat(pitchInput.value);
 
-      // Speak
       synth.speak(utterance);
     }
 
@@ -215,7 +238,6 @@
     speakBtn.addEventListener('click', startSpeech);
     stopBtn.addEventListener('click', stopSpeech);
 
-    // Dynamic parameter updates (restarts audio if playing while settings change)
     voiceSelect.addEventListener('change', () => {
       if (synth.speaking) startSpeech();
     });
@@ -230,7 +252,6 @@
       if (synth.speaking) startSpeech();
     });
 
-    // Update label text while sliding for better UI feedback
     rateInput.addEventListener('input', () => {
       rateVal.textContent = rateInput.value;
     });
